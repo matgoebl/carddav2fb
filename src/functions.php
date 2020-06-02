@@ -428,13 +428,31 @@ function filtersMatch(Document $vcard, array $filters): bool
 }
 
 /**
- * Export cards to fritzbox xml
+ * convert vCards into contacts of FRITZ!box xml format
  *
  * @param Document[] $cards
  * @param array $conversions
- * @return SimpleXMLElement     the XML phone book in Fritz Box format
+ * @return SimpleXMLElement[] fritzbox XML contact format
  */
-function exportPhonebook(array $cards, array $conversions): SimpleXMLElement
+function convertVCards(array $cards, array $conversions): array
+{
+    $converter = new Converter($conversions);
+    $contacts = [];
+
+    foreach ($cards as $card) {
+        $contacts = array_merge($contacts, $converter->convert($card));
+    }
+    return $contacts;
+}
+
+/**
+ * get contacts in fritzbox xml format
+ *
+ * @param SimpleXMLElement[] $contacts
+ * @param array $conversions
+ * @return SimpleXMLElement $xmlPhonebook
+ */
+function contactsToFritzXML(array $contacts, array $conversions): SimpleXMLElement
 {
     $xmlPhonebook = new SimpleXMLElement(
         <<<EOT
@@ -448,36 +466,44 @@ EOT
     $root = $xmlPhonebook->xpath('//phonebook')[0];
     $root->addAttribute('name', $conversions['phonebook']['name']);
 
-    $converter = new Converter($conversions);
     $restore = new Restorer;
 
-    foreach ($cards as $card) {
-        $contacts = $converter->convert($card);
-        foreach ($contacts as $contact) {
-            $restore->xml_adopt($root, $contact);
-        }
+    foreach ($contacts as $contact) {
+        $restore->xml_adopt($root, $contact);
     }
     return $xmlPhonebook;
 }
 
 /**
- * Upload cards to fritzbox
+ * get secure access to FRITZ!Box router
  *
- * @param SimpleXMLElement  $xmlPhonebook
- * @param array             $config
- * @return void
+ * @param array $fritzConfig
+ * @return Api $fritz
  */
-function uploadPhonebook(SimpleXMLElement $xmlPhonebook, array $config)
+function getFritzBoxAccess(array $fritzConfig)
 {
-    $options = $config['fritzbox'];
-
-    $fritz = new Api($options['url']);
-    $fritz->setAuth($options['user'], $options['password']);
-    $fritz->mergeClientOptions($options['http'] ?? []);
+    $fritz = new Api($fritzConfig['url']);
+    $fritz->setAuth($fritzConfig['user'], $fritzConfig['password']);
+    $fritz->mergeClientOptions($fritzConfig['http'] ?? []);
     $fritz->login();
 
+    return $fritz;
+}
+
+/**
+ * Upload cards to fritzbox
+ *
+ * @param SimpleXMLElement $xmlPhonebook
+ * @param array $fritzConfig
+ * @param array $phonebookConfig
+ * @return void
+ */
+function uploadPhonebook(SimpleXMLElement $xmlPhonebook, array $fritzConfig, array $phonebookConfig)
+{
+    $fritz = getFritzBoxAccess($fritzConfig);
+
     $formfields = [
-        'PhonebookId' => $config['phonebook']['id']
+        'PhonebookId' => $phonebookConfig['id']
     ];
 
     $filefields = [
@@ -511,25 +537,22 @@ function uploadSuccessful(string $msg): bool
 /**
  * Downloads the phone book from Fritzbox
  *
- * @param   array $fritzbox
- * @param   array $phonebook
+ * @param array $fritzConfig
+ * @param array $phonebookConfig
  * @return  SimpleXMLElement|bool with the old existing phonebook
  */
-function downloadPhonebook(array $fritzbox, array $phonebook)
+function downloadPhonebook(array $fritzConfig, array $phonebookConfig)
 {
-    $fritz = new Api($fritzbox['url']);
-    $fritz->setAuth($fritzbox['user'], $fritzbox['password']);
-    $fritz->mergeClientOptions($fritzbox['http'] ?? []);
-    $fritz->login();
+    $fritz = getFritzBoxAccess($fritzConfig);
 
     $formfields = [
-        'PhonebookId' => $phonebook['id'],
-        'PhonebookExportName' => $phonebook['name'],
+        'PhonebookId' => $phonebookConfig['id'],
+        'PhonebookExportName' => $phonebookConfig['name'],
         'PhonebookExport' => "",
     ];
     $result = $fritz->postFile($formfields, []); // send the command to load existing phone book
     if (substr($result, 0, 5) !== "<?xml") {
-        error_log("ERROR: Could not load phonebook with ID=".$phonebook['id']);
+        error_log("ERROR: Could not load phonebook with ID=".$phonebookConfig['id']);
         return false;
     }
     $xmlPhonebook = simplexml_load_string($result);
