@@ -3,6 +3,4 @@ parameters:
 	universalObjectCratesClasses:
 		- Sabre\VObject\Document
 	ignoreErrors:
-		- '#Property Sabre.VObject.Document::.FULLNAME .Sabre.VObject.Property. does not accept string#'
-		- '#Property Sabre.VObject.Document::.IMAGEURL .Sabre.VObject.Property. does not accept string#'
 		- '#Parameter .1 .str of function strtoupper expects string, Sabre.VObject.Node given#'
