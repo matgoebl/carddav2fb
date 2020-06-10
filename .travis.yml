@@ -19,9 +19,6 @@ notifications:
     on_success: never
     on_failure: change
 
-matrix:
-  fast_finish: true
-
 jobs:
   include:
     - stage: Test
