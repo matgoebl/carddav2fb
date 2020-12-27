@@ -150,7 +150,7 @@ class Converter
         $services = $this->contact->addChild('services');
 
         foreach ($addresses as $idx => $address) {
-            $email = $services->addChild('email', $address['email']);
+            $email = $services->addChild('email', htmlspecialchars($address['email']));
             $email->addAttribute('id', (string)$idx);
 
             if (isset($address['classifier'])) {
