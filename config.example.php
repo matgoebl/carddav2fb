@@ -66,10 +66,10 @@ $config = [
 
     'conversions' => [
         'vip' => [
-            'category' => [
-                'vip1'
+            'categories' => [
+                'VIP'
             ],
-            'group' => [
+            'groups' => [
                 'PERS'
             ],
         ],
